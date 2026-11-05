@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Футбольный дайджест</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000;
+    --card:#0c0c0e;
+    --card-2:#141417;
+    --line:#1f1f24;
+    --text:#f2f2f5;
+    --muted:#8a8a96;
+    --gold:#f2c94c;
+    --real:#f2c94c;      /* Реал — золото */
+    --zenit:#3d9bff;     /* Зенит — голубой */
+    --win:#2fd17a;
+    --draw:#a0a0ab;
+    --loss:#ff5c5c;
+    --official:#2fd17a;
+    --rumor:#ff9f43;
+    --injury:#ff5c7a;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.5 Inter,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:600px;margin:0 auto;padding:0 16px 48px}
+  a{color:inherit}
+
+  /* ---------- Шапка ---------- */
+  .hero{
+    position:relative;overflow:hidden;
+    margin:0 -16px 20px;padding:calc(28px + env(safe-area-inset-top)) 20px 26px;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(242,201,76,.16), transparent 55%),
+      radial-gradient(90% 80% at 0% 100%, rgba(61,155,255,.14), transparent 60%),
+      #050506;
+    border-bottom:1px solid var(--line);
+  }
+  /* разметка поля */
+  .hero::before{
+    content:"";position:absolute;right:-70px;top:50%;width:220px;height:220px;
+    border:2px solid rgba(255,255,255,.05);border-radius:50%;transform:translateY(-50%);
+  }
+  .hero::after{
+    content:"";position:absolute;right:39px;top:0;bottom:0;width:2px;background:rgba(255,255,255,.05);
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+  .brand .ball{font-size:18px;filter:grayscale(.2)}
+  .hero h1{
+    font-family:Unbounded,Inter,sans-serif;font-weight:800;
+    font-size:30px;line-height:1.1;margin:10px 0 6px;letter-spacing:-.01em;
+  }
+  .hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--gold),#fff3c4);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .clubs{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .club{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+  .club.real{color:var(--real);border-color:rgba(242,201,76,.35)}
+  .club.zenit{color:var(--zenit);border-color:rgba(61,155,255,.35)}
+
+  /* ---------- Выпуск ---------- */
+  .issue-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 2px 12px}
+  .issue-head h2{font-family:Unbounded,Inter,sans-serif;font-weight:600;font-size:18px;margin:0}
+  .period{color:var(--muted);font-size:12px;margin:0;text-align:right}
+  .badge-new{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;color:#000;background:var(--gold);padding:2px 7px;border-radius:6px;margin-left:8px;vertical-align:3px}
+
+  section{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:12px;
+  }
+  section h3{
+    display:flex;align-items:center;gap:8px;
+    font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 10px;
+  }
+  section h3 .ico{font-size:15px;letter-spacing:0}
+  section ul{list-style:none;margin:0;padding:0}
+  section li{padding:9px 0;border-top:1px solid var(--line)}
+  section li:first-child{border-top:0;padding-top:0}
+  section li:last-child{padding-bottom:0}
+  b{font-weight:600}
+  .none{color:var(--muted)}
+
+  /* Главное */
+  section.top{
+    background:linear-gradient(135deg,rgba(242,201,76,.14),rgba(242,201,76,.02) 60%),var(--card);
+    border-color:rgba(242,201,76,.35);
+  }
+  section.top h3{color:var(--gold)}
+  section.top li{font-size:16px}
+
+  /* Картинки к новостям */
+  .pic{display:block;width:100%;height:auto;max-height:420px;object-fit:cover;border-radius:14px;margin:0 0 10px;border:1px solid var(--line);background:var(--card-2)}
+  section.top .pic{border-color:rgba(242,201,76,.35)}
+
+  /* Ссылки-источники */
+  .src{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .src a{
+    font-size:12px;font-weight:500;text-decoration:none;color:#c9c9d3;
+    padding:3px 9px;border-radius:999px;background:var(--card-2);border:1px solid var(--line);
+  }
+  .src a::after{content:" ↗";opacity:.5}
+  .src a:active,.src a:hover{border-color:#3a3a44;color:#fff}
+
+  /* Табло матча */
+  .match{display:block}
+  .meta{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+  .board{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;
+    background:var(--card-2);border:1px solid var(--line);border-radius:14px;padding:10px 12px;
+  }
+  .team{font-weight:600;font-size:14px}
+  .team.home{text-align:right}
+  .team.mine.real{color:var(--real)}
+  .team.mine.zenit{color:var(--zenit)}
+  .score{
+    font-family:Unbounded,Inter,sans-serif;font-weight:800;font-size:20px;
+    padding:4px 12px;border-radius:10px;background:#000;border:1px solid var(--line);min-width:72px;text-align:center;
+  }
+  .score.win{color:var(--win);border-color:rgba(47,209,122,.4)}
+  .score.loss{color:var(--loss);border-color:rgba(255,92,92,.4)}
+  .score.draw{color:var(--draw)}
+  .note{font-size:13px;color:#c9c9d3;margin-top:7px}
+
+  /* Метки */
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:1px}
+  .tag.official{color:var(--official);background:rgba(47,209,122,.12)}
+  .tag.rumor{color:var(--rumor);background:rgba(255,159,67,.12)}
+  .tag.injury{color:var(--injury);background:rgba(255,92,122,.12)}
+
+  /* Игроки */
+  .player{display:flex;gap:12px;align-items:flex-start}
+  .avatar{
+    flex:0 0 36px;height:36px;border-radius:50%;display:grid;place-items:center;
+    font-weight:700;font-size:12px;color:#000;background:linear-gradient(135deg,#e9e9ef,#9c9ca8);
+  }
+  .avatar.goat{background:linear-gradient(135deg,var(--gold),#fff1b8)}
+
+  /* Ближайшие матчи */
+  .fixture{display:flex;align-items:center;gap:12px}
+  .date{
+    flex:0 0 52px;text-align:center;border-radius:12px;background:var(--card-2);border:1px solid var(--line);padding:5px 0;
+  }
+  .date .d{display:block;font-family:Unbounded,Inter,sans-serif;font-weight:800;font-size:18px;line-height:1.1}
+  .date .m{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .fixture .info{flex:1;min-width:0}
+  .fixture .when{font-size:12px;color:var(--muted)}
+  .fixture.real .date{border-color:rgba(242,201,76,.35)}
+  .fixture.zenit .date{border-color:rgba(61,155,255,.35)}
+
+  /* ---------- Архив ---------- */
+  .archive-title{font-family:Unbounded,Inter,sans-serif;font-weight:600;font-size:14px;color:var(--muted);margin:32px 2px 10px}
+  details{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:8px;overflow:hidden}
+  details summary{list-style:none;padding:14px 16px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  details summary::-webkit-details-marker{display:none}
+  details summary::after{content:"＋";color:var(--muted);transition:transform .2s}
+  details[open] summary::after{transform:rotate(45deg)}
+  details article{padding:0 12px 4px}
+  details section{background:var(--card-2)}
+  .empty{color:var(--muted);font-size:13px;margin:0 2px;padding:14px 16px;border:1px dashed var(--line);border-radius:14px;text-align:center}
+
+  footer{color:#4a4a54;font-size:11px;text-align:center;margin-top:32px}
+
+  @media (max-width:380px){
+    .hero h1{font-size:26px}
+    .score{font-size:17px;min-width:60px;padding:4px 8px}
+    .team{font-size:13px}
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <div class="brand"><span class="ball">⚽</span> Каждое утро · 09:00 по Тбилиси</div>
+  <h1>Футбольный<br><em>дайджест</em></h1>
+  <div class="clubs">
+    <span class="club real">Реал Мадрид</span>
+    <span class="club zenit">Зенит</span>
+    <span class="club">ЛЧ · РПЛ · Ла Лига · сборные</span>
+  </div>
+</header>
+
+<!-- LATEST:START -->
+<article class="latest">
+  <div class="issue-head">
+    <h2>5 ноября<span class="badge-new">NEW</span></h2>
+    <p class="period">за 48 часов · первый выпуск</p>
+  </div>
+
+  <section class="top">
+    <h3><span class="ico">⭐</span>Главное</h3>
+    <ul>
+      <li>
+        <img class="pic" src="digests/img/2026-11-05-1.jpg" alt="Роналду завершил карьеру в сборной" loading="lazy">
+        <b>Криштиану Роналду завершил карьеру в сборной Португалии.</b> За 23 года в сборной: 234 матча, 146 голов, 45 ассистов, Евро-2016 и две Лиги наций. Сборная готовит церемонию в его честь, дату пока не назвали.
+        <div class="src"><a href="https://t.me/myachPRO/25127">МЯЧ</a><a href="https://t.me/myachPRO/25130">Заявление</a><a href="https://t.me/okkosport/44417">Okko</a></div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">⚽</span>Результаты</h3>
+    <ul>
+      <li class="match">
+        <img class="pic" src="digests/img/2026-11-05-2.jpg" alt="Итоги дня ЛЧ: АЕК — Реал 2:3" loading="lazy">
+        <div class="meta">Лига чемпионов · 4 тур</div>
+        <div class="board">
+          <span class="team home">АЕК</span>
+          <span class="score win">2:3</span>
+          <span class="team mine real">Реал</span>
+        </div>
+        <div class="note">Реал дважды отыгрывался, победу на 90+2' принёс Вальверде. Голы: Беллингем 32', Мбаппе 78', Вальверде 90+2'. У Реала 12 очков из 12, столько же только у ПСЖ.</div>
+        <div class="src"><a href="https://t.me/myachPRO/25122">МЯЧ</a><a href="https://t.me/myachPRO/25123">Таблица</a><a href="https://www.realmadrid.com/en-US/news/football/first-team/reports/cronica-aek-atenas-real-madrid-champions-03-11-2026">Real Madrid</a></div>
+      </li>
+      <li>
+        <b style="color:var(--zenit)">Зенит</b> за эти дни не играл. Последний матч был 2 ноября: «Крылья» — «Зенит» 0:3, шестая победа подряд и 1-е место в РПЛ. Следующий матч: <b>8 ноября, «Зенит» — «Ростов», 18:30 МСК</b>.
+        <div class="src"><a href="https://lenta.ru/news/2026/11/02/zenit-vyigral-shestoy-match-podryad-v-rpl-i-vernulsya-na-pervoe-mesto/">Lenta</a></div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">👤</span>Мои игроки</h3>
+    <ul>
+      <li class="player">
+        <span class="avatar">ДБ</span>
+        <div><b>Беллингем</b> открыл счёт Реала в Афинах на 32-й минуте.
+          <div class="src"><a href="https://t.me/myachPRO/25122">МЯЧ</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">КМ</span>
+        <div><b>Мбаппе</b> забил на 78-й и сравнял счёт 2:2, после чего Вальверде вырвал победу.
+          <div class="src"><a href="https://t.me/myachPRO/25122">МЯЧ</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">ТК</span>
+        <div><b>Куртуа</b> сделал 3 сейва против АЕК, два из них сохранили Реалу шансы на победу.
+          <div class="src"><a href="https://goal.com/en-in/news/real-madrid-vs-aek-athens-player-ratings-champions-league/blte0ce92d36f7434da">Goal</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">МС</span>
+        <div><img class="pic" src="digests/img/2026-11-05-5.jpg" alt="Вильярреал — ПСЖ 0:6, Сафонов на ноль" loading="lazy">
+          <b>Сафонов</b> отстоял на ноль: «Вильярреал» — ПСЖ 0:6 (3 ноября). Это его первый сухой матч в ЛЧ в этом сезоне, ПСЖ лидирует с 12 очками. Сам он пошутил про «прекрасный счёт для тенниса».
+          <div class="src"><a href="https://matchtv.ru/football/matchtvnews_NI2382823_PSZh_razgromil_Viljarreal_v_matche_Ligi_chempionov_Safonov_otygral_na_nol">Матч ТВ</a><a href="https://t.me/myachrus/10112">МЯЧ RU</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">АБ</span>
+        <div><img class="pic" src="digests/img/2026-11-05-4.jpg" alt="Батраков — дубль «Штутгарту»" loading="lazy">
+          <b>Батраков</b> оформил дубль за 3 минуты (12' и 15'): «Галатасарай» — «Штутгарт» 2:0 (3 ноября). Он первый за 11 лет россиянин с дублем в ЛЧ, признан лучшим игроком матча и попал в символическую сборную тура.
+          <div class="src"><a href="https://lenta.ru/news/2026/11/03/batrakov-oformil-dubl-za-galatasaray-v-matche-ligi-chempionov/">Lenta</a><a href="https://t.me/okkosport/44415">Okko</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">EH</span>
+        <div><img class="pic" src="digests/img/2026-11-05-3.jpg" alt="Лейпциг — Ман Сити 2:3, гол Холанда" loading="lazy">
+          <b>Холанд</b> забил «Лейпцигу» (2:3). Теперь у него 62 гола в 61 матче ЛЧ и 2-е место в списке лучших бомбардиров турнира.
+          <div class="src"><a href="https://t.me/myachPRO/25120">МЯЧ</a></div></div>
+      </li>
+      <li class="player">
+        <span class="avatar">МГ</span>
+        <div><b>Глушенков</b> забил 10 голов в РПЛ, столько же у Соболева. По данным «МЯЧ RU», 70% голов команды в чемпионате забили россияне.
+          <div class="src"><a href="https://t.me/myachrus/10118">МЯЧ RU</a></div></div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">🔁</span>Трансферы</h3>
+    <ul>
+      <li><span class="tag official">Официально</span><span class="none">Нет новостей</span></li>
+      <li><span class="tag rumor">Слухи</span><span class="none">Нет новостей по Реалу и Зениту</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">🩹</span>Травмы</h3>
+    <ul>
+      <li><span class="tag injury">Реал</span>Родриго (колено) выбыл примерно до конца декабря, Менди под вопросом до конца года. У Вальверде серьёзной травмы нет.
+        <div class="src"><a href="https://www.sportsmole.co.uk/football/real-madrid/injury-news/injuries-and-suspensions/vinicius-rodrygo-updates-real-madrid-injury-suspension-news-vs-valencia_608458.html">Sports Mole</a></div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">🔥</span>Ещё важное</h3>
+    <ul>
+      <li><b>«Комо» разгромил «Ланс» 9:1 в гостях.</b> Это самая крупная выездная победа в истории ЛЧ, Дувикас сделал хет-трик и отдал ассист.
+        <div class="src"><a href="https://t.me/okkosport/44407">Okko</a><a href="https://t.me/myachPRO/25121">МЯЧ</a></div></li>
+      <li><b>«Ливерпуль» неожиданно проиграл «Фенербахче» 2:3.</b>
+        <div class="src"><a href="https://t.me/myachPRO/25122">МЯЧ</a></div></li>
+      <li><b>УЕФА наказал «Ланс»</b> за беспорядки болельщиков в Брюгге: на два следующих выезда в ЛЧ фанатов клуба не пустят.
+        <div class="src"><a href="https://t.me/myachPRO/25126">МЯЧ</a></div></li>
+      <li><span class="tag rumor">Слух</span><b>РПЛ:</b> по данным «МЯЧ RU», «Локомотив» решил расстаться с Галактионовым и объявит об этом после матча с «Рубином» в пятницу.
+        <div class="src"><a href="https://t.me/myachrus/10117">МЯЧ RU</a></div></li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><span class="ico">📅</span>Ближайшие матчи</h3>
+    <ul>
+      <li class="fixture real">
+        <span class="date"><span class="d">7</span><span class="m">ноя</span></span>
+        <div class="info"><b>Валенсия — Реал</b><div class="when">Ла Лига · 23:00 МСК · в гостях</div>
+          <div class="src"><a href="https://www.espn.com/soccer/match/_/gameId/401882808">ESPN</a></div></div>
+      </li>
+      <li class="fixture zenit">
+        <span class="date"><span class="d">8</span><span class="m">ноя</span></span>
+        <div class="info"><b>Зенит — Ростов</b><div class="when">РПЛ · 18:30 МСК</div>
+          <div class="src"><a href="https://ria.ru/category_premier_league_russia/">РИА</a></div></div>
+      </li>
+    </ul>
+  </section>
+</article>
+<!-- LATEST:END -->
+
+<h2 class="archive-title">Архив</h2>
+<!-- ARCHIVE:START -->
+<p class="empty">Пока пусто — архив появится с завтрашним выпуском</p>
+<!-- ARCHIVE:END -->
+
+<footer>Только проверенные новости · у каждой есть источник</footer>
+</main>
+</body>
+</html>
