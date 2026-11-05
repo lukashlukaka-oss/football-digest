@@ -46,6 +46,9 @@ $files = Get-ChildItem -Path $ProjectRoot -Recurse -File -Force | Where-Object {
     $rel = $_.FullName.Substring($ProjectRoot.Length + 1)
     -not ($rel -eq '.env' -or $rel -like '.claude*' -or $rel -like '.git\*' -or $rel -like '*.tmp')
 }
+if ($Only) { $Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim().Replace('\', '/') }) }
+# state first: the cloud must see "already sent" before it sees a new digest
+$files = @($files | Sort-Object { if ($_.FullName -like '*\state\*') { 0 } else { 1 } }, FullName)
 if ($Only) { $files = $files | Where-Object { $rel = $_.FullName.Substring($ProjectRoot.Length + 1).Replace('\', '/'); $Only -contains $rel } }
 
 $n = 0
