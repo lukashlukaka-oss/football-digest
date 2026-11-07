@@ -37,6 +37,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout --orphan sources-tmp
           git reset --quiet
-          git add sources
+          git add -f sources
           git commit --quiet -m "sources $(TZ=Europe/Moscow date '+%F %H:%M') MSK"
           git push --force origin sources-tmp:sources
