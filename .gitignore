@@ -1,2 +1,5 @@
 # Секреты — никогда не отправлять в GitHub
 .env
+
+# materials collected by GitHub live in the separate 'sources' branch
+sources/
