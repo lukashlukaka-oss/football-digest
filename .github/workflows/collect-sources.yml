@@ -1,0 +1,42 @@
+# Каждое утро GitHub скачивает материалы для дайджеста (посты Telegram-каналов, фото, матчи ESPN)
+# и кладёт их в отдельную ветку "sources". Облачный Claude читает их и пишет выпуск.
+# Ветка перезаписывается каждый раз, поэтому репозиторий не разрастается.
+name: Collect sources
+
+on:
+  schedule:
+    - cron: "15 3 * * *"   # 06:15 МСК / 07:15 Тбилиси (GitHub может запускать с опозданием до часа)
+  push:
+    branches: [main]
+    paths:
+      - "scripts/collect-sources.ps1"
+      - ".github/workflows/collect-sources.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect-sources
+  cancel-in-progress: true
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download posts, photos and matches
+        shell: pwsh
+        run: ./scripts/collect-sources.ps1
+
+      - name: Publish to the "sources" branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan sources-tmp
+          git reset --quiet
+          git add sources
+          git commit --quiet -m "sources $(TZ=Europe/Moscow date '+%F %H:%M') MSK"
+          git push --force origin sources-tmp:sources
