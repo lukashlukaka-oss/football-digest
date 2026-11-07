@@ -98,7 +98,7 @@ $Leagues = [ordered]@{
 $WatchAll = @('esp.1', 'uefa.champions', 'rus.1', 'uefa.nations', 'fifa.world', 'uefa.euro', 'fifa.worldq.uefa')
 $PlayerTeams = 'Real Madrid|Zenit|Paris Saint-Germain|Galatasaray|Manchester City|Al Nassr|Portugal|Russia|Belgium|France|England|Norway'
 
-$matches = New-Object System.Collections.Generic.List[object]
+$games = New-Object System.Collections.Generic.List[object]
 foreach ($lg in $Leagues.Keys) {
     for ($d = -2; $d -le 7; $d++) {
         $date = $nowUtc.AddDays($d).ToString('yyyyMMdd')
@@ -120,28 +120,28 @@ foreach ($lg in $Leagues.Keys) {
                 $x = if ($_.ownGoal) { ' (OG)' } elseif ($_.penaltyKick) { ' (pen)' } else { '' }
                 "$($_.clock.displayValue) $who$x [$tm]"
             })
-            $matches.Add([pscustomobject]@{
+            $games.Add([pscustomobject]@{
                 Kick = $kick; League = $Leagues[$lg]; Home = $h.team.displayName; Away = $a.team.displayName
                 Score = $score; Status = $ev.status.type.description; Goals = ($goals -join '; '); Id = $ev.id; Slug = $lg
             })
         }
     }
 }
-$matches = @($matches | Sort-Object Id -Unique | Sort-Object Kick)
+$games = @($games | Sort-Object Id -Unique | Sort-Object Kick)
 
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("# Матчи (ESPN), собрано $($nowUtc.Add($Msk).ToString('yyyy-MM-dd HH:mm')) МСК")
 [void]$sb.AppendLine("Формат: дата время МСК | турнир | ХОЗЯЕВА — ГОСТИ | счёт | статус | голы. Названия команд и игроков — как в ESPN (по-английски), в выпуске пиши по-русски.")
 [void]$sb.AppendLine()
 [void]$sb.AppendLine('## Сыграно (последние 48 ч)')
-foreach ($m in ($matches | Where-Object { $_.Score })) {
+foreach ($m in ($games | Where-Object { $_.Score })) {
     [void]$sb.AppendLine(("{0} МСК | {1} | {2} — {3} | {4} | {5} | {6} | https://www.espn.com/soccer/match/_/gameId/{7}" -f $m.Kick.Add($Msk).ToString('yyyy-MM-dd HH:mm'), $m.League, $m.Home, $m.Away, $m.Score, $m.Status, $m.Goals, $m.Id))
 }
 [void]$sb.AppendLine()
 [void]$sb.AppendLine('## Расписание (7 дней)')
-foreach ($m in ($matches | Where-Object { -not $_.Score })) {
+foreach ($m in ($games | Where-Object { -not $_.Score })) {
     [void]$sb.AppendLine(("{0} МСК | {1} | {2} — {3} | https://www.espn.com/soccer/match/_/gameId/{4}" -f $m.Kick.Add($Msk).ToString('yyyy-MM-dd HH:mm'), $m.League, $m.Home, $m.Away, $m.Id))
 }
 [IO.File]::WriteAllText((Join-Path $Out 'matches.md'), $sb.ToString(), $Utf8)
 
-Write-Output ("DONE: {0} posts, {1} images, {2} matches" -f $posts.Count, $n, $matches.Count)
+Write-Output ("DONE: {0} posts, {1} images, {2} matches" -f $posts.Count, $n, $games.Count)
