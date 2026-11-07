@@ -44,7 +44,7 @@ Write-Output "Repository: $($me.full_name) (private=$($me.private))"
 
 $files = Get-ChildItem -Path $ProjectRoot -Recurse -File -Force | Where-Object {
     $rel = $_.FullName.Substring($ProjectRoot.Length + 1)
-    -not ($rel -eq '.env' -or $rel -like '.claude*' -or $rel -like '.git\*' -or $rel -like '*.tmp')
+    -not ($rel -eq '.env' -or $rel -like '.claude*' -or $rel -like '.git\*' -or $rel -like '*.tmp' -or $rel -like 'sources\*')
 }
 if ($Only) { $Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim().Replace('\', '/') }) }
 # state first: the cloud must see "already sent" before it sees a new digest
