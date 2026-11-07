@@ -8,7 +8,9 @@ param(
     [switch]$DryRun,
     [string]$Now,      # подменить «сейчас» (UTC) для проверки
     [string]$Dates,    # подменить даты поиска, например 20261104
-    [string]$TestLineup
+    [string]$TestLineup,
+    [switch]$Watch,             # не завершаться, пока идёт/скоро начнётся матч (для облака)
+    [int]$WatchMinutes = 330    # максимум работы в режиме слежения
 )
 . (Join-Path $PSScriptRoot 'tg-common.ps1')
 
@@ -42,8 +44,11 @@ $Msk = [TimeSpan]::FromHours(3)
 function Ru([string]$name) { if ($TeamRu.ContainsKey($name)) { $TeamRu[$name] } else { $name } }
 function Esc([string]$s) { $s.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;') }
 
-$nowUtc = if ($Now) { [DateTimeOffset]::Parse($Now).UtcDateTime } else { [DateTime]::UtcNow }
-$dateList = if ($Dates) { @($Dates -split ',') } else { @($nowUtc.AddDays(-1).ToString('yyyyMMdd'), $nowUtc.ToString('yyyyMMdd')) }
+function Update-Now {
+    $script:nowUtc = if ($Now) { [DateTimeOffset]::Parse($Now).UtcDateTime } else { [DateTime]::UtcNow }
+    $script:dateList = if ($Dates) { @($Dates -split ',') } else { @($nowUtc.AddDays(-1).ToString('yyyyMMdd'), $nowUtc.ToString('yyyyMMdd'), $nowUtc.AddDays(1).ToString('yyyyMMdd')) }
+}
+Update-Now
 
 # --- что уже отправлено ---
 $stateDir = Join-Path $ProjectRoot 'state'
@@ -172,6 +177,11 @@ if ($TestLineup) {   # проверка составов: -TestLineup uefa.champ
     exit 0
 }
 
+$PreWindow = if ($Watch) { 15 } else { 20 }   # за сколько минут до начала слать «скоро матч»
+
+function Invoke-Check {
+Update-Now
+$script:myMatches = @()
 foreach ($league in $Leagues.Keys) {
     foreach ($d in $dateList) {
         try {
@@ -191,10 +201,11 @@ foreach ($league in $Leagues.Keys) {
             $mins = [Math]::Round(($kick - $nowUtc).TotalMinutes)
             $state = $ev.status.type.state           # pre / in / post
             $tour = $Leagues[$league]
+            $script:myMatches += [pscustomobject]@{ Id = $id; Kick = $kick; State = $state; Title = $title }
 
-            # ⏰ за 15 минут (окно 0–20 минут, проверка раз в 5 минут)
+            # ⏰ за 15 минут до начала
             $myId = "$($mine[0].team.id)"
-            if ($state -eq 'pre' -and $mins -le 20 -and $mins -ge 0 -and -not $sent["${id}:pre"]) {
+            if ($state -eq 'pre' -and $mins -le $PreWindow -and $mins -ge 0 -and -not $sent["${id}:pre"]) {
                 $msg = "⏰ <b>Через $mins мин: $title</b>`n🏆 $tour · $kickMsk МСК"
                 $lu = Get-MyLineup $league $id $myId
                 $msg += if ($lu) { "`n`n$lu" } else { "`n`n📋 Состав пока не объявлен." }
@@ -243,11 +254,41 @@ foreach ($league in $Leagues.Keys) {
         }
     }
 }
+}
 
 # --- запомнить отправленное (храним только последние 200 записей) ---
-if (-not $DryRun) {
+function Save-State {
+    if ($DryRun) { return }
     if (-not (Test-Path $stateDir)) { New-Item -ItemType Directory -Force $stateDir | Out-Null }
     $keep = [ordered]@{}
     foreach ($k in ($sent.Keys | Sort-Object | Select-Object -Last 200)) { $keep[$k] = $sent[$k] }
     [IO.File]::WriteAllText($stateFile, ($keep | ConvertTo-Json), $Utf8NoBom)
+}
+
+Invoke-Check
+Save-State
+
+# --- режим слежения: GitHub запускает проверку неточно (раз в 30–60 минут),
+#     поэтому если матч скоро начнётся или уже идёт — остаёмся и проверяем каждую минуту ---
+if ($Watch) {
+    $started = [DateTime]::UtcNow
+    while (([DateTime]::UtcNow - $started).TotalMinutes -lt $WatchMinutes) {
+        $active = @($myMatches | Where-Object {
+            ($_.State -eq 'in') -or
+            ($_.State -eq 'pre' -and ($_.Kick - $nowUtc).TotalMinutes -le 150 -and ($_.Kick - $nowUtc).TotalMinutes -gt -180) -or
+            ($_.State -eq 'post' -and -not $sent["$($_.Id):final"])
+        })
+        if ($active.Count -eq 0) { break }
+        # до «за 15 минут» ещё далеко — спим подольше, иначе — минуту
+        $next = ($active | Where-Object { $_.State -eq 'pre' } | ForEach-Object { ($_.Kick - $nowUtc).TotalMinutes - $PreWindow } | Measure-Object -Minimum).Minimum
+        $sleep = 60
+        if ($null -ne $next -and $next -gt 3 -and -not ($active | Where-Object { $_.State -ne 'pre' })) { $sleep = [Math]::Min(600, [int](($next - 2) * 60)) }
+        $left = [int]($WatchMinutes * 60 - ([DateTime]::UtcNow - $started).TotalSeconds)
+        if ($left -le 0) { break }
+        $sleep = [Math]::Min($sleep, $left)
+        Write-Output ("WATCH: {0} active match(es), next check in {1}s" -f $active.Count, $sleep)
+        Start-Sleep -Seconds $sleep
+        Invoke-Check
+        Save-State
+    }
 }
