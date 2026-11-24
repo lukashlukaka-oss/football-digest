@@ -158,7 +158,7 @@ function Find-LineupPhoto([string]$myTeamId, [DateTime]$kickUtc) {
             $t = [regex]::Match($b, 'datetime="([^"]+)"').Groups[1].Value
             if (-not $t) { continue }
             $postUtc = [DateTimeOffset]::Parse($t).UtcDateTime
-            if ($postUtc -lt $kickUtc.AddHours(-3) -or $postUtc -gt $kickUtc.AddMinutes(30)) { continue }
+            if ($postUtc -lt $kickUtc.AddHours(-3) -or $postUtc -gt $kickUtc.AddMinutes(30) -or $postUtc -gt $nowUtc) { continue }
             $txt = [System.Net.WebUtility]::HtmlDecode(([regex]::Replace([regex]::Match($b, 'tgme_widget_message_text[^>]*>(.*?)</div>', 'Singleline').Groups[1].Value, '<[^>]+>', ' '))).ToLower()
             if ($txt -notmatch $src.must) { continue }
             $img = [regex]::Match($b, "tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)").Groups[1].Value
@@ -201,7 +201,7 @@ foreach ($league in $Leagues.Keys) {
             $mins = [Math]::Round(($kick - $nowUtc).TotalMinutes)
             $state = $ev.status.type.state           # pre / in / post
             $tour = $Leagues[$league]
-            $script:myMatches += [pscustomobject]@{ Id = $id; Kick = $kick; State = $state; Title = $title }
+            $script:myMatches += [pscustomobject]@{ Id = $id; Kick = $kick; State = $state; Title = $title; Team = "$($mine[0].team.id)" }
 
             # ⏰ за 15 минут до начала
             $myId = "$($mine[0].team.id)"
@@ -254,6 +254,111 @@ foreach ($league in $Leagues.Keys) {
         }
     }
 }
+Invoke-ExtraCheck
+}
+
+# =====================================================================
+#  Матчи, которых нет в ESPN (например, Кубок России).
+#  Список ведёт облачный Claude в data/extra-fixtures.json:
+#  [{ "team": "2533", "home": "Зенит", "away": "Крылья Советов",
+#     "tournament": "Кубок России", "kick_utc": "2026-11-24T16:30:00Z" }]
+#  Состав и ход матча берём из официального Telegram-канала клуба.
+# =====================================================================
+$ClubChannel = @{ '2533' = 'fczenit' }
+$ChannelCache = @{}
+
+function Get-ChannelPosts([string]$ch) {
+    if ($ChannelCache.ContainsKey($ch)) { return $ChannelCache[$ch] }
+    $list = @()
+    try {
+        $html = (Invoke-WebRequest "https://t.me/s/$ch" -UseBasicParsing -UserAgent 'Mozilla/5.0' -TimeoutSec 20).Content
+        foreach ($b in ($html -split 'tgme_widget_message_wrap' | Select-Object -Skip 1)) {
+            $ref = [regex]::Match($b, 'data-post="([^"]+)"').Groups[1].Value
+            $dt = [regex]::Match($b, 'datetime="([^"]+)"').Groups[1].Value
+            if (-not $ref -or -not $dt) { continue }
+            $raw = [regex]::Match($b, 'tgme_widget_message_text[^>]*>(.*?)</div>', 'Singleline').Groups[1].Value
+            $text = [System.Net.WebUtility]::HtmlDecode((($raw -replace '<br\s*/?>', "`n") -replace '<[^>]+>', '')).Trim()
+            $list += [pscustomobject]@{ Ref = $ref; When = [DateTimeOffset]::Parse($dt).UtcDateTime; Text = $text }
+        }
+    } catch { }
+    $ChannelCache[$ch] = $list
+    return $list
+}
+
+# «1️⃣ : 0️⃣» -> «1:0»; возвращает последний счёт из текста или $null
+#   (берём только «цифры-эмодзи», чтобы не спутать счёт со временем «19:30»)
+function Get-ScoreFromText([string]$t) {
+    $m = [regex]::Matches($t, '((?:[0-9]️?⃣)+)\s*:\s*((?:[0-9]️?⃣)+)')
+    if ($m.Count -eq 0) { return $null }
+    $last = $m[$m.Count - 1]
+    $a = $last.Groups[1].Value -replace '[^0-9]', ''
+    $b = $last.Groups[2].Value -replace '[^0-9]', ''
+    return "${a}:${b}"
+}
+
+function Invoke-ExtraCheck {
+    $script:ChannelCache = @{}   # каждый раз свежие посты
+    $file = Join-Path (Join-Path $ProjectRoot 'data') 'extra-fixtures.json'
+    if (-not (Test-Path $file)) { return }
+    try { $fixtures = @([IO.File]::ReadAllText($file, [Text.Encoding]::UTF8) | ConvertFrom-Json) } catch { Write-Output "WARN extra-fixtures.json: $($_.Exception.Message)"; return }
+    foreach ($f in $fixtures) {
+        if (-not $f.kick_utc -or -not $f.team) { continue }
+        $team = "$($f.team)"
+        $kick = [DateTimeOffset]::Parse($f.kick_utc).UtcDateTime
+        $mins = [Math]::Round(($kick - $nowUtc).TotalMinutes)
+        if ($mins -gt 180 -or $mins -lt -240) { continue }   # далеко до матча или давно прошёл
+        # если ESPN всё-таки знает этот матч — не дублируем
+        if (@($myMatches | Where-Object { [Math]::Abs(($_.Kick - $kick).TotalMinutes) -lt 180 -and "$($_.Team)" -eq $team }).Count -gt 0) { continue }
+
+        $id = "x$team-" + $kick.ToString('yyyyMMddHHmm')
+        $title = (Esc $f.home) + ' — ' + (Esc $f.away)
+        $tour = if ($f.tournament) { Esc $f.tournament } else { 'Матч' }
+        $kickMsk = $kick.Add($Msk).ToString('HH:mm')
+        $ch = $ClubChannel[$team]
+        $posts = if ($ch) { @(Get-ChannelPosts $ch | Where-Object { $_.When -ge $kick.AddMinutes(-10) -and $_.When -le $nowUtc }) } else { @() }
+
+        # завершён? — пост с итогом после 90 минут игры или 2,5 часа с начала
+        $finalPost = $posts | Where-Object { $_.When -ge $kick.AddMinutes(100) -and $_.Text -match '(?i)заверш|финальн\w* свист|матч окончен|итог|побед|поражени|ничья|спасибо за поддержку' } | Select-Object -Last 1
+        $isOver = $finalPost -or ($nowUtc -ge $kick.AddMinutes(150))
+        $started = $nowUtc -ge $kick.AddMinutes(1)
+        $state = if ($isOver) { 'post' } elseif ($started) { 'in' } else { 'pre' }
+        $script:myMatches += [pscustomobject]@{ Id = $id; Kick = $kick; State = $state; Title = $title; Team = $team }
+
+        if ($state -eq 'pre' -and $mins -le $PreWindow -and $mins -ge 0 -and -not $sent["${id}:pre"]) {
+            $photo = Find-LineupPhoto $team $kick
+            $msg = "⏰ <b>Через $mins мин: $title</b>`n🏆 $tour · $kickMsk МСК"
+            $msg += if ($photo) { "`n`n📋 Стартовый состав — на фото (официальный канал клуба)" } else { "`n`n📋 Состав пока не опубликован." }
+            Send-Alert "${id}:pre" $msg $photo
+        }
+
+        if ($state -eq 'in' -and -not $sent["${id}:start"]) {
+            $msg = "🟢 <b>Матч начался!</b> $title`n🏆 $tour"
+            $photo = $null
+            if (-not $sent["${id}:pre"]) {
+                $photo = Find-LineupPhoto $team $kick
+                if ($photo) { $msg += "`n`n📋 Стартовый состав — на фото" }
+                $sent["${id}:pre"] = 'skipped'
+            }
+            Send-Alert "${id}:start" $msg $photo
+        }
+
+        if ($state -eq 'post' -and -not $sent["${id}:final"]) {
+            if (($nowUtc - $kick).TotalHours -le 6) {
+                # последний счёт из постов канала во время матча
+                $score = $null
+                foreach ($p in $posts) { $s = Get-ScoreFromText $p.Text; if ($s) { $score = $s } }
+                $msg = "🏁 <b>Матч завершён: $title</b>`n🏆 $tour"
+                if ($score) { $msg += "`n`nСчёт по данным канала клуба: <b>$score</b>" }
+                if ($finalPost) {
+                    $txt = $finalPost.Text; if ($txt.Length -gt 300) { $txt = $txt.Substring(0, 300) + '…' }
+                    $msg += "`n`n«" + (Esc $txt) + "»`n<a href=`"https://t.me/$($finalPost.Ref)`">Пост клуба</a>"
+                }
+                Send-Alert "${id}:final" $msg
+            } else { $sent["${id}:final"] = 'old' }
+            if (-not $sent["${id}:start"]) { $sent["${id}:start"] = 'skipped' }
+            if (-not $sent["${id}:pre"]) { $sent["${id}:pre"] = 'skipped' }
+        }
+    }
 }
 
 # --- запомнить отправленное (храним только последние 200 записей) ---
